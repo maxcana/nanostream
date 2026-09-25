@@ -19,10 +19,10 @@ pub const BitWriter = struct {
 
     /// Writes bits and moves forward.
     ///
-    /// - `stuff`: Expects LTR structure placed at the right like `0b00010100`</param>
+    /// - `stuff`: Expects LTR structure placed at the right like `0b00010100`
     /// - `bits`: Number of bits to write from `stuff` (RTL). Maximum `64`. I can't use comptime here, so I'm just trusting you DO NOT MAKE IT >64.
     ///
-    /// Ex: `stuff`=`0b0000000000000000000000000000000000000000000000000000000011110100` with bits = `5` adds `10100` to the stream.</param>
+    /// Ex: `stuff`=`0b0000000000000000000000000000000000000000000000000000000011110100` with bits = `5` adds `10100` to the stream.
     fn writeBits(self: *BitWriter, stuff: u64, bits: u8) void {
         var stufff = stuff; // make it mut
 
@@ -116,7 +116,12 @@ pub const BitWriter = struct {
                     self.writeBits(@as(u64, backing_val), backing_info.bits);
                 }
             },
-            .@"struct" => self.writeByteArray(std.mem.asBytes(&n)),
+            .@"struct" => |info| {
+                if (info.layout == .auto) {
+                    @compileError("struct '" ++ @typeName(@TypeOf(n)) ++ "' must be `extern` or `packed` for a stable wire layout");
+                }
+                self.writeByteArray(std.mem.asBytes(&n));
+            },
 
             // ... (all iX, uX, fX, plus bool. the custom types like i27 works as well probably)
             else => {
@@ -174,7 +179,7 @@ pub const BitReader = struct {
 
     /// Reads bits and moves forward.
     ///
-    /// - `bits`: Maximum `64`.</param>
+    /// - `bits`: Maximum `64`.
     ///
     /// Bits are placed in an output of the exact specified bit-width.
     /// Ex. ...`0000000`(You are here)`1100101`... with `bits`=`5` returns a `u5`: `0b11001`.
@@ -281,6 +286,11 @@ test "symmetry" {
         b: bool,
         u: u16,
     };
+    const Thing2 = extern struct {
+        f: f32 align(1),
+        i: i64 align(256),
+        u: u32 align(1),
+    };
 
     var gpa = std.heap.DebugAllocator(.{}){};
     const DBG = gpa.allocator();
@@ -296,6 +306,7 @@ test "symmetry" {
     const e: u63 = 4328948392435433;
     const f = "wazzup beijing";
     const g = Thing{ .f = -10, .b = false, .u = 5000 };
+    const h = Thing2{ .f = -3249.51, .i = 88942121, .u = 400000000 };
 
     w.write(a);
     w.write(b);
@@ -304,6 +315,7 @@ test "symmetry" {
     w.write(e);
     w.writeString(f);
     w.write(g);
+    w.write(h);
 
     const arr = try w.conclude();
     defer DBG.free(arr);
@@ -319,4 +331,5 @@ test "symmetry" {
     defer DBG.free(fr);
     try std.testing.expectEqualStrings(f, fr);
     try std.testing.expectEqual(r.read(Thing), g);
+    try std.testing.expectEqual(r.read(Thing2), h);
 }

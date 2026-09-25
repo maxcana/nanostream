@@ -9,11 +9,12 @@ drop in the source file to your project
 
 if you want struct ser/des interop, make sure the structs are the same byte layout:
 - C#: `[StructLayout(LayoutKind.Sequential, Pack = 1)]`
-- Zig: `packed struct`.
+- Zig: `extern struct` with `align(1)` on every field
+
+note: struct interop is untested! nanostream is primarily for primitives and those are heavily tested.
+
 
 ### C#
-#### basic example
-
 ```cs
 using Nanostream;
 
@@ -40,7 +41,7 @@ void Example()
     w.Write((sbyte)-11);        // 8 bits
 
     w.Write(Fruit.Apple);       // 16 bits
-    w.Write(new Thing { f = -10f, b = false, u = 5000 }); // 7 bytes
+    w.WriteStruct(new Thing { f = -10f, b = false, u = 5000 }); // 7 bytes
     w.Write(true);              // 1 bit
 
     byte[] data = w.Conclude();
@@ -57,100 +58,18 @@ void Example()
     r.Read(out sbyte sb);       // -11
 
     r.Read(out Fruit fruit);    // Fruit.Apple
-    r.Read(out Thing thing);    // { f = -10f, b = false, u = 5000 }
+    r.ReadStruct(out Thing thing); // { f = -10f, b = false, u = 5000 }
     r.Read(out bool b);         // true
-}
-
-```
-
-#### detailed example
-```cs
-void Example()
-{
-    // ser
-    BitWriter w = new();
-    Stuff stuff = new();
-    Ser(stuff);
-    Ser(stuff);
-    Ser(stuff);
-    byte[] data = w.Conclude();
-
-    // des
-    BitReader r = new(data);
-    Stuff s1 = Stuff.Des(r);
-    Stuff s2 = Stuff.Des(r);
-    Stuff s3 = Stuff.Des(r);
-}
-
-enum Fruit : ushort { Apple = 67, Pear = 0xFF12 }
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-struct Thing
-{
-    public float f;
-    // public fixed byte b[3]; // this works, it's just too much code for example
-    public ushort u;
-}
-
-public class Stuff
-{
-    Fruit fruit;
-    byte eleven;
-    float[] numbers;
-    Thing thing;
-    string comment;
-
-    public Stuff()
-    {
-        fruit = Fruit.Apple;
-        eleven = 11;
-        numbers = new float[]{ 32420.3173f, 15f, -19 };
-        thing = new Thing { f = -10f, u = 5000 };
-        comment = "goodbyte, world!";
-    }
-
-    void Ser(BitWriter w)
-    {
-        w.Write(fruit);
-        w.Write(eleven);
-
-        w.Write((ushort)numbers.Length);
-        foreach(var v in numbers)
-        {
-            w.Write(v);
-        }
-
-        w.WriteStruct(thing);
-        w.WriteString(comment);
-    }
-
-    public static Stuff Des(BitReader r)
-    {
-        Stuff instance = new();
-        r.Read(out instance.fruit);
-        r.Read(out instance.eleven);
-
-        r.Read(out ushort len);
-        instance.numbers = new float[len];
-        for(ushort i = 0; i < len; i++)
-        {
-            r.Read(out instance.numbers[i]);
-        }
-
-        r.ReadStruct(out instance.thing);
-        r.ReadString(out instance.comment);
-        return instance;
-    }
 }
 ```
 
 ### Zig
 ```zig
 const Fruit = enum(u16) { Apple = 67, Pear = 0xFF12 };
-const Thing = packed struct {
-    f: f32,
-    b: bool,
-    u: u16,
+const Thing = extern struct {
+    f: f32 align(1),
+    b: bool align(1),
+    u: u16 align(1),
 };
 
 pub fn example(alloc: std.mem.Allocator) !void {

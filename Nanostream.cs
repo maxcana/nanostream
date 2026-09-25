@@ -1,5 +1,3 @@
-
-using System;
 using System.Runtime.CompilerServices;
 using static System.Runtime.CompilerServices.MethodImplOptions;
 using System.Buffers.Binary;
@@ -148,7 +146,7 @@ namespace Nanostream
         
         /// <summary>
         /// Write any unmanaged struct (size never changes; no List, only fixed arrays).<br/><br/>
-        /// <b>Warning</b>: with should work on-the-wire and be compatible with Zig's read(TS), but it's untested.<br/>
+        /// <b>Warning</b>: should work on-the-wire and be compatible with Zig's read(TS), but it's untested.<br/>
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public unsafe void WriteStruct<TS>(TS value) where TS : unmanaged
@@ -413,7 +411,7 @@ namespace Nanostream
         }
     }
 
-    public class ByteList
+    class ByteList
     {
         public byte[] backingArr;
         public int Count;
